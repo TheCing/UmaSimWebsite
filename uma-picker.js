@@ -5,7 +5,7 @@ import { Strategy, UmaBuilder } from './globalsim/index.js';
 import { strategyName } from './compare.js';
 import { ICONS, escapeHtml, memberInfo, outfitOf, umaChipBody, umaDisplayName } from './team-picker.js';
 import { umaPreviewHtml } from './uma-editor.js';
-import { convertTrainedChara } from './trained-chara-import.js';
+import { convertUmaJson, parseUmaText } from './uma-import.js';
 
 // Aptitude grades, worst to best; a filter keeps umas at or above the chosen grade.
 const GRADES = ['G', 'F', 'E', 'D', 'C', 'B', 'A', 'S'];
@@ -13,13 +13,16 @@ const gradeRank = (grade) => GRADES.indexOf(String(grade));
 
 /**
  * The umas in an uploaded file: one runner object, an array of runners, a team file
- * ({ members: [...] }), or the game's own trained-uma records (one or an array, e.g. an
- * UmaExtractor / Trackside data.json), whose aptitudes follow `course`. Every runner is validated.
- * Unknown skills in game records are dropped; `onSkipped(count)` hears about them.
+ * ({ members: [...] }), or umas saved by another tool (see uma-import.js), whose aptitudes
+ * follow `course`. Every runner is validated. `onNote(message)` hears what a source left out.
  */
-export function umasFromFile(json, { course = null, onSkipped = () => {} } = {}) {
-  const converted = convertTrainedChara(json, course);
-  if (converted?.skipped) onSkipped(converted.skipped);
+export function umasFromFile(json, { course = null, onNote = () => {} } = {}) {
+  const converted = convertUmaJson(json, course);
+  if (converted) {
+    for (const note of converted.notes) onNote(note);
+    const n = converted.skipped;
+    if (n) onNote(`left out ${n} skill${n === 1 ? '' : 's'} this site doesn't know`);
+  }
   const runners = converted ? converted.runners
     : Array.isArray(json) ? json : Array.isArray(json?.members) ? json.members : [json];
   if (!runners.length) throw new Error('no umas in this file');
@@ -233,8 +236,8 @@ export function createUmaPicker({ roster, onSelect, onNew, onEdit, direct = fals
     const problems = [];
     for (const file of fileInput.files) {
       try {
-        const onSkipped = (n) => problems.push(`${file.name}: left out ${n} skill${n === 1 ? '' : 's'} this site doesn't know`);
-        for (const runner of umasFromFile(JSON.parse(await file.text()), { course: course(), onSkipped })) await roster.addUma(runner);
+        const onNote = (note) => problems.push(`${file.name}: ${note}`);
+        for (const runner of umasFromFile(parseUmaText(await file.text()), { course: course(), onNote })) await roster.addUma(runner);
       } catch (error) {
         problems.push(`${file.name}: ${error.message}`);
       }
