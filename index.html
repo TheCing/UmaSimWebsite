@@ -522,6 +522,7 @@
 
     const umaPicker = createUmaPicker({
         roster,
+        course: () => currentCourse(),
         onSelect: ({slot, index}, umaId) => putUma(slot, index, umaId),
         onEdit: (savedUmaId) => {
             const uma = roster.uma(savedUmaId);

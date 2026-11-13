@@ -57,7 +57,7 @@ export function parseHakurakuLink(input) {
 }
 
 /** A runner's own unique: a non-inherited skill that has an inherited version. */
-function isOwnUnique(skill) {
+export function isOwnUnique(skill) {
   if (skillIsInherited(skill)) return false;
   try {
     inheritedSkill(skill);

@@ -11,6 +11,7 @@ import {
   ICONS, escapeHtml, outfitForUnique, outfitIconUrl, outfitOf, outfitsOf, portraitUrl, umaIconUrl, uniqueForOutfit,
 } from './team-picker.js';
 import { canonicalJson } from './roster.js';
+import { convertTrainedChara } from './trained-chara-import.js';
 
 const GRADES = ['S', 'A', 'B', 'C', 'D', 'E', 'F', 'G'];
 // [runner JSON field, label, icon in assets/stats/]
@@ -611,7 +612,7 @@ export function createUmaEditor({ onConfirm, onClose, inline = null, onChange })
     try { return { data: validated(), error: null }; } catch (error) { return { data: null, error: error.message }; }
   }
 
-  /** Inline: load a single uma (a runner, a list of runners or a team file; the first uma) from a JSON file. */
+  /** Inline: load a single uma (a runner, a list of runners, a team file or game trained-uma records; the first uma) from a JSON file. */
   async function importFile(input) {
     const file = input.files[0];
     input.value = '';
@@ -620,7 +621,8 @@ export function createUmaEditor({ onConfirm, onClose, inline = null, onChange })
       const json = JSON.parse(await file.text());
       // A run may have started (and disabled the editor) while the file was being read.
       if (inline && dialog.closest('fieldset')?.disabled) throw new Error('the optimizer is running; import again when it stops');
-      const runner = Array.isArray(json) ? json[0] : Array.isArray(json?.members) ? json.members[0] : json;
+      const runner = convertTrainedChara(Array.isArray(json) ? json.slice(0, 1) : json, course)?.runners[0]
+        ?? (Array.isArray(json) ? json[0] : Array.isArray(json?.members) ? json.members[0] : json);
       if (!runner || typeof runner !== 'object') throw new Error('no uma in this file');
       UmaBuilder.fromJson(structuredClone(runner));
       draft = inlineDraft(runner);
