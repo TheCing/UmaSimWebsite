@@ -8,7 +8,8 @@
 // link doesn't say which, so snapshots are tried newest first (a preferred cm first).
 //
 // Members are converted exactly like UmaSim's scrape_umalogs.py, which built the opponent pools.
-import { inheritedSkill, isSkill, isUma, skillIsInherited } from './globalsim/index.js';
+import { isSkill, isUma } from './globalsim/index.js';
+import { isOwnUnique } from './uma-ids.js';
 
 export const HAKURAKU_API = 'https://hakuraku.moe/api/simdata';
 
@@ -54,17 +55,6 @@ export function parseHakurakuLink(input) {
     } catch { /* fall through */ }
   }
   throw new Error('That doesn\'t look like a hakuraku team link (it needs a team=… part).');
-}
-
-/** A runner's own unique: a non-inherited skill that has an inherited version. */
-export function isOwnUnique(skill) {
-  if (skillIsInherited(skill)) return false;
-  try {
-    inheritedSkill(skill);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 /**

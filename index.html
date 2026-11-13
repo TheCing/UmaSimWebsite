@@ -200,6 +200,7 @@
     import {randomTeamName} from './team-names.js';
     import {createUmaPicker} from './uma-picker.js';
     import {createUmaEditor, newUmaDraft} from './uma-editor.js';
+    import {aptitudesForCourse} from './uma-import.js';
 
     const $ = (id) => document.getElementById(id);
     const output = $('output');
@@ -783,6 +784,9 @@
             // Copies of the teams and names as they are now: the boxes stay editable during the run
             // (and edits change a box's team in place), but the results belong to what was raced.
             const tested = slots.map((slot) => structuredClone(teams[slot].team));
+            // Imported umas carry every aptitude: use the ones for this race.
+            const raceCourse = Course.get(race.courseId);
+            for (const team of tested) team.members = team.members.map((m) => aptitudesForCourse(m, raceCourse));
             const testedNames = slots.map((slot) => teams[slot].name ?? slotLabel(slot));
             const poolLabel = $('pool').selectedOptions[0]?.label ?? null;
             tested.forEach((team) => validateTeamMembers(team.members));

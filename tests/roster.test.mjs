@@ -98,3 +98,19 @@ test('importing a backup rehashes nicknamed umas with their names', async () => 
   assert.equal(imported.id, await umaIdOf(runner(1001), 'Nick'));
   assert.equal(imported.favorite, true);
 });
+
+test('addUmas saves a whole import at once and keeps umas already there', async () => {
+  const storage = memoryStorage();
+  let writes = 0;
+  const setItem = storage.setItem;
+  storage.setItem = (key, value) => { writes++; setItem(key, value); };
+  const roster = Roster.load({ storage });
+  const kept = await roster.addUma(runner(1001), { favorite: true });
+  writes = 0;
+  const ids = await roster.addUmas([runner(1001), runner(1002), runner(1003), runner(1002)]);
+  assert.equal(writes, 1);
+  assert.equal(ids[0], kept);
+  assert.equal(ids[1], ids[3]);
+  assert.equal(roster.umas().length, 3);
+  assert.equal(roster.uma(kept).favorite, true);
+});

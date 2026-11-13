@@ -237,7 +237,7 @@ export function createUmaPicker({ roster, onSelect, onNew, onEdit, direct = fals
     for (const file of fileInput.files) {
       try {
         const onNote = (note) => problems.push(`${file.name}: ${note}`);
-        for (const runner of umasFromFile(parseUmaText(await file.text()), { course: course(), onNote })) await roster.addUma(runner);
+        await roster.addUmas(umasFromFile(parseUmaText(await file.text()), { course: course(), onNote }));
       } catch (error) {
         problems.push(`${file.name}: ${error.message}`);
       }

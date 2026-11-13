@@ -116,6 +116,22 @@ export class Roster {
   }
 
   /**
+   * Add many umas (runner JSON, no nicknames) in one save, e.g. a whole imported file. Returns
+   * their ids in order. Umas already in the roster are left as they are.
+   */
+  async addUmas(list) {
+    list.forEach(checkUmaData);
+    const ids = await Promise.all(list.map((data) => umaIdOf(data, null)));
+    const now = Date.now();
+    this.#commit((state) => {
+      ids.forEach((id, i) => {
+        state.umas[id] ??= { id, name: null, favorite: false, data: structuredClone(list[i]), addedAt: now };
+      });
+    });
+    return ids;
+  }
+
+  /**
    * Replace an uma's data and/or nickname (`name` omitted = keep it). Returns the new id; teams
    * that used the old id now use the new one.
    */

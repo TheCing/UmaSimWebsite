@@ -6,6 +6,7 @@ import { loadTeam, strategyName } from './compare.js';
 import { teamFromFile } from './team-import.js';
 import { hakurakuTeamName, importHakurakuTeam } from './hakuraku-import.js';
 import { OUTFITS } from './outfits.js';
+import { outfitForUnique } from './uma-ids.js';
 
 // GitHub Octicons (MIT), 16px.
 const svg = (path, cls = '') => `<svg${cls ? ` class="${cls}"` : ''} viewBox="0 0 16 16" aria-hidden="true"><path d="${path}"/></svg>`;
@@ -57,19 +58,7 @@ export function umaIconUrl(charaId) {
 /** The costumes a character has (see outfits.js), oldest first. */
 export const outfitsOf = (charaId) => OUTFITS[charaId] ?? [];
 
-/** The unique skill id of an outfit. */
-export function uniqueForOutfit(outfitId) {
-  const s = String(outfitId);
-  return String(100000 + 10000 * (Number(s.slice(-2)) - 1) + Number(s.slice(1, -2)) * 10 + 1);
-}
-
-/** The outfit a unique skill belongs to (6-digit 3★+ uniques, or the older 5-digit ones). */
-export function outfitForUnique(skillId) {
-  const s = String(skillId ?? '');
-  if (s.length === 6 && s[0] === '1' && s[5] === '1') return 100000 + Number(s.slice(2, 5)) * 100 + Number(s[1]) + 1;
-  if (s.length === 5 && s[0] === '1' && s[4] === '1') return Math.floor(Number(s) / 10) * 100 + (Number(s) % 10);
-  return null;
-}
+export { outfitForUnique, uniqueForOutfit } from './uma-ids.js';
 
 /**
  * An uma's costume: its `outfitId` field if it has one, else worked out from its unique skill,

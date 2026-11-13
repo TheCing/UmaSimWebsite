@@ -6,6 +6,7 @@ import { raceLabel } from './compare.js';
 import { createRaceControls } from './race-controls.js';
 import { Roster } from './roster.js';
 import { createUmaInlineEditor, newUmaDraft, skillIconUrl } from './uma-editor.js';
+import { aptitudesForCourse } from './uma-import.js';
 import { escapeHtml, memberInfo, outfitOf, umaChipBody, uniqueForOutfit } from './team-picker.js';
 import {
   archetypeOptions, fetchArchetypeTeams, loadManifest, loadPool, loadPoolIndex, loadSnapshotData,
@@ -470,7 +471,8 @@ async function optimize(resume = false) {
   const fetchImpl = (url, options) => fetch(url, { ...options, signal: controller.signal });
   try {
     output.innerHTML = '<p class="uc-opt-status">Loading teams...</p>';
-    const runUma = config.uma;
+    // Imported umas carry every aptitude: use the ones for this race.
+    const runUma = aptitudesForCourse(config.uma, Course.get(race.courseId));
     const own = runUma.skills?.find?.((s) => s.isUnique);
     const unique = own?.skillId ?? (outfitOf(runUma) ? uniqueForOutfit(outfitOf(runUma).id) : null);
     const uniqueLevel = Number(own?.level) || settings.uniqueFallback;

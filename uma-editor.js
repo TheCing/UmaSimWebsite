@@ -11,7 +11,7 @@ import {
   ICONS, escapeHtml, outfitForUnique, outfitIconUrl, outfitOf, outfitsOf, portraitUrl, umaIconUrl, uniqueForOutfit,
 } from './team-picker.js';
 import { canonicalJson } from './roster.js';
-import { convertUmaJson, parseUmaText } from './uma-import.js';
+import { aptitudesForCourse, convertUmaJson, parseUmaText, styleAptitude } from './uma-import.js';
 
 const GRADES = ['S', 'A', 'B', 'C', 'D', 'E', 'F', 'G'];
 // [runner JSON field, label, icon in assets/stats/]
@@ -427,6 +427,7 @@ export function createUmaEditor({ onConfirm, onClose, inline = null, onChange })
     else if (!unique && next) skillsOf().unshift({ skillId: next, level: 1, isUnique: true });
 
     if (newCharacter) {
+      delete draft.allAptitudes; // the old character's aptitudes
       draft.skills = skillsOf().filter((s) => s.isUnique || pickableSkill(charaId, String(s.skillId)));
       const outfit = outfitsOf(charaId).find((o) => o.id === outfitId) ?? outfitsOf(charaId)[0];
       if (outfit) {
@@ -472,7 +473,11 @@ export function createUmaEditor({ onConfirm, onClose, inline = null, onChange })
         menu.hidden = !menu.hidden;
         break;
       }
-      case 'apt-set': draft[el.dataset.field] = el.dataset.grade; render(); break;
+      case 'apt-set':
+        draft[el.dataset.field] = el.dataset.grade;
+        delete draft.allAptitudes; // a hand-set grade replaces the imported aptitude table
+        render();
+        break;
       case 'open-skill': picker = 'skill'; render(); document.getElementById('umaEditorSkillSearch').focus(); break;
       case 'open-unique': picker = 'unique'; render(); document.getElementById('umaEditorSkillSearch').focus(); break;
       case 'close-picker': picker = null; render(); break;
@@ -528,7 +533,11 @@ export function createUmaEditor({ onConfirm, onClose, inline = null, onChange })
 
   dialog.addEventListener('change', (event) => {
     const el = event.target;
-    if (el.dataset.action === 'strategy') draft.strategy = el.value;
+    if (el.dataset.action === 'strategy') {
+      draft.strategy = el.value;
+      // With an imported aptitude table the style aptitude follows the new style.
+      if (draft.allAptitudes) { draft.strategyAptitude = styleAptitude(draft.allAptitudes, draft.strategy) ?? draft.strategyAptitude; render(); }
+    }
     if (el.dataset.action === 'unique-level') uniqueEntry().level = Number(el.value);
     if (el.dataset.action === 'import-file') { importFile(el); return; }
     updateDirtyDot();
@@ -669,7 +678,7 @@ export function createUmaEditor({ onConfirm, onClose, inline = null, onChange })
     /** Inline: replace the draft and report the resulting state once. Only the unique skill is kept. */
     set(data) {
       silent = true;
-      draft = inlineDraft(data);
+      draft = inlineDraft(aptitudesForCourse(data, course));
       picker = null;
       charOpen = false;
       render();
@@ -681,7 +690,15 @@ export function createUmaEditor({ onConfirm, onClose, inline = null, onChange })
     /** Inline: { data, error } for the current draft. */
     validate,
     /** Set the course ({ surface, category }) that a newly chosen character's aptitude defaults follow. */
-    setCourse(raceCourse) { course = raceCourse; },
+    setCourse(raceCourse) {
+      course = raceCourse;
+      // An imported uma's aptitudes follow the race.
+      if (draft?.allAptitudes && course) {
+        draft = aptitudesForCourse(draft, course);
+        render();
+        emit();
+      }
+    },
     /**
      * Edit a copy of `data` (runner JSON). `openTarget` is passed back to onConfirm.
      * `raceCourse` ({ surface, category }) picks which aptitudes a new character's defaults fill in.
@@ -690,7 +707,7 @@ export function createUmaEditor({ onConfirm, onClose, inline = null, onChange })
       course = raceCourse;
       isNew = Boolean(openTarget?.isNew);
       target = openTarget;
-      draft = structuredClone(data);
+      draft = structuredClone(aptitudesForCourse(data, raceCourse));
       nickname = currentNickname ?? '';
       picker = null;
       charOpen = false;

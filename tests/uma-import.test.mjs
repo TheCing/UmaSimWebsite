@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Course, UmaBuilder } from '../globalsim/index.js';
-import { convertUmaJson, isTrainedChara, parseUmaText, runnerFromTrainedChara } from '../uma-import.js';
+import { aptitudesForCourse, convertUmaJson, isTrainedChara, parseUmaText, runnerFromTrainedChara } from '../uma-import.js';
+import { teamFromFile } from '../team-import.js';
 
 // A veteran as the game server sends it (trimmed; no account fields).
 const VETERAN = {
@@ -21,7 +22,7 @@ test('a veteran converts to runner JSON the engine accepts', () => {
     charaId: 1040, speed: 1200, stamina: 567, power: 899, guts: 434, wisdom: 1126,
     strategy: 'Senkou', distanceAptitude: 'S', surfaceAptitude: 'A', strategyAptitude: 'A',
     skills: [{ skillId: '100401', level: 5, isUnique: true }, { skillId: '200332', level: 1, isUnique: false }],
-    outfitId: 104001,
+    outfitId: 104001, allAptitudes: 'FSBDDABGAE',
   });
   UmaBuilder.fromJson(runner);
 });
@@ -44,7 +45,7 @@ test('a front runner with Runaway is Oonige, rated with the front-runner aptitud
 
 test('race dumps: pow, chara_id and motivation', () => {
   const { power, ...rest } = VETERAN;
-  const { runner } = runnerFromTrainedChara({ ...rest, pow: power, chara_id: 1040, motivation: 5 });
+  const { runner } = runnerFromTrainedChara({ ...rest, pow: power, chara_id: 1040, motivation: 5 }, null, { withMood: true });
   assert.equal(runner.power, 899);
   assert.equal(runner.charaId, 1040);
   assert.equal(runner.mood, 2);
@@ -103,21 +104,21 @@ test('UmaLauncher training log: comma-separated packets, the last chara_info win
   const { runners } = convertUmaJson(parseUmaText(text));
   assert.equal(runners.length, 1);
   assert.equal(runners[0].speed, 1200);
-  assert.equal(runners[0].mood, 2);
+  assert.equal(runners[0].mood, undefined); // a career's last mood isn't a race mood
   UmaBuilder.fromJson(runners[0]);
 });
 
 test('UmaLauncher account export: letter aptitudes, only the unique as a skill', () => {
   const entry = {
     card_id: 104001, stats: { speed: 1100, stamina: 700, power: 800, guts: 400, wisdom: 900 },
-    running_style: 'Leader', talent_level: 4,
+    running_style: 'Leader', talent_level: 4, rarity: 4,
     aptitudes: { turf: 'A', dirt: 'E', short: 'F', mile: 'S', middle: 'B', long: 'D', runner: 'D', leader: 'A', betweener: 'B', chaser: 'G' },
   };
   const result = convertUmaJson({ exported_at: 'x', raised_characters: [entry] }, course(2, 4));
   const [runner] = result.runners;
   assert.equal(runner.strategy, 'Senkou');
   assert.deepEqual([runner.distanceAptitude, runner.surfaceAptitude, runner.strategyAptitude], ['D', 'E', 'A']);
-  assert.deepEqual(runner.skills, [{ skillId: '100401', level: 4, isUnique: true }]);
+  assert.deepEqual(runner.skills, [{ skillId: '100401', level: 5, isUnique: true }]); // 4 stars -> Lv 5
   assert.match(result.notes[0], /no skill list/);
   UmaBuilder.fromJson(runner);
 });
@@ -134,7 +135,7 @@ test('Trackside Team Trials history (JSON Lines): costume aptitudes, one uma per
   assert.equal(runner.wisdom, 1000);
   assert.equal(runner.strategy, 'Senkou');
   assert.match(result.notes[0], /default aptitudes/);
-  assert.deepEqual(runner.skills.map((s) => s.isUnique), [true, false]);
+  assert.deepEqual(runner.skills.map((s) => [s.isUnique, s.level]), [[true, 4], [false, 1]]);
   UmaBuilder.fromJson(runner);
 });
 
@@ -157,4 +158,51 @@ test('parseUmaText: plain JSON, JSON Lines, and the original error for anything 
   assert.deepEqual(parseUmaText('{"a":1}'), { a: 1 });
   assert.deepEqual(parseUmaText('{"a":1}\n{"a":2}'), [{ a: 1 }, { a: 2 }]);
   assert.throws(() => parseUmaText('not json'), SyntaxError);
+});
+
+test('the aptitude table follows the race; runners without one are left alone', () => {
+  const { runner } = runnerFromTrainedChara(VETERAN, course(1, 2));
+  const dirtLong = aptitudesForCourse({ ...runner, strategy: 'Sasi' }, course(2, 4));
+  assert.deepEqual([dirtLong.distanceAptitude, dirtLong.surfaceAptitude, dirtLong.strategyAptitude], ['D', 'E', 'B']);
+  const plain = { charaId: 1040, distanceAptitude: 'A' };
+  assert.equal(aptitudesForCourse(plain, course(2, 4)), plain);
+});
+
+test('limit counts converted umas: an unusable first uma does not stop the editor import', () => {
+  const result = convertUmaJson([{ ...VETERAN, card_id: 999901 }, VETERAN, VETERAN], null, { limit: 1 });
+  assert.equal(result.runners.length, 1);
+  assert.equal(result.runners[0].charaId, 1040);
+});
+
+test('CM dumps say that every runner was included', () => {
+  const { notes } = convertUmaJson({ race_horse_data_array: [VETERAN] });
+  assert.match(notes[0], /every runner/);
+});
+
+test('Team Trials rows of different umas sharing a trained_chara_id stay separate', () => {
+  const row = (chara_id) => ({ trial_id: 't', trained_chara_id: 7, chara_id, stats: { speed: 1, stamina: 1, power: 1, guts: 1, wiz: 1 }, running_style: 'SENKO', owned_skills: [] });
+  assert.equal(convertUmaJson([row(104001), row(105601)]).runners.length, 2);
+});
+
+test('parseUmaText ignores a JSON Lines file\'s cut-off last line, but not a broken middle one', () => {
+  assert.deepEqual(parseUmaText('{"a":1}\n{"a":2}\n{"a":'), [{ a: 1 }, { a: 2 }]);
+  assert.throws(() => parseUmaText('{"a":1}\n{"a":\n{"a":3}'), SyntaxError);
+});
+
+test('team import reads race dumps through the same conversion, in member order', () => {
+  const { power, ...rest } = VETERAN;
+  const member = (card_id, team_member_id, team_id = 1) => ({
+    _responseHorseData: { ...rest, pow: power, card_id, chara_id: Math.floor(card_id / 100), team_id, team_member_id },
+    _runningStyleEx: 'None',
+  });
+  const team = [member(105601, 2), member(104001, 1), member(100101, 3)];
+  const dump = {
+    '<RaceHorse>k__BackingField': [...team, member(100201, 1, 2)],
+    '<PlayerTeamMemberArray>k__BackingField': [team[0]],
+    '<CourseDistanceType>k__BackingField': 'Long',
+  };
+  const loaded = teamFromFile(dump, 'race');
+  assert.deepEqual(loaded.members.map((m) => m.charaId), [1040, 1056, 1001]);
+  assert.equal(loaded.id, 'race-team1');
+  assert.throws(() => teamFromFile({ raceHorse: [] }, 'x'), /which team is yours/);
 });
