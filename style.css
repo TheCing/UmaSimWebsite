@@ -60,6 +60,24 @@ body {
   -webkit-text-fill-color: transparent;
   background-clip: text;
   letter-spacing: 0.03em;
+  white-space: normal;
+}
+
+/* "fork by Cing" pill after the brand: solid text (not the brand's gradient), like the result badges. */
+.uc-nav-fork {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 9px;
+  border: 1px solid var(--uc-border-accent);
+  border-radius: 20px;
+  background: rgba(244, 114, 182, .1);
+  color: var(--uc-pink-light);
+  -webkit-text-fill-color: var(--uc-pink-light);
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+  vertical-align: middle;
+  white-space: nowrap;
 }
 
 .page-header {
